@@ -1,0 +1,2010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klondike Solitaire: Chain Hunter - Hyper Edition</title>
+    <!-- Tailwind CSS for robust layout styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for retro-arcade typography styling -->
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Orbitron:wght@700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #020208;
+            font-family: 'Orbitron', sans-serif;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        /* Neon panel styled with 3D glass reflections */
+        .arcade-panel {
+            background: rgba(10, 10, 30, 0.85);
+            border: 3px solid #3b82f6;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5), inset 0 0 15px rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+        }
+
+        /* Prevent system dragging artifacts on interactive elements */
+        img, div, span, button {
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+    </style>
+</head>
+<body class="w-full h-screen flex flex-col items-center justify-between p-4 relative">
+
+    <!-- HEADER BAR: Controls, Hints toggle, Undos, and retry parameters -->
+    <header class="w-full max-w-5xl flex flex-wrap justify-between items-center gap-2 z-10">
+        <div class="flex items-center gap-3">
+            <h1 class="text-xs md:text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-pink-500 to-cyan-400" style="font-family: 'Press Start 2P', monospace;">
+                KLONDIKE: CHAIN HUNTER
+            </h1>
+            <span class="text-[9px] md:text-xs bg-red-600 text-white font-bold px-2 py-0.5 rounded animate-pulse">HYPER ED.</span>
+        </div>
+
+        <div class="flex gap-1.5 flex-wrap">
+            <!-- Hints Toggle Button -->
+            <button id="btnHints" onclick="toggleHints()" class="px-2.5 py-1.5 rounded text-[10px] md:text-xs font-bold bg-gray-800 border border-gray-600 hover:bg-gray-700 transition">
+                HINTS: ON
+            </button>
+            <!-- Backtrack Undo Move Button -->
+            <button id="btnUndo" onclick="performUndo()" class="px-2.5 py-1.5 rounded text-[10px] md:text-xs font-bold bg-indigo-950 border border-indigo-500 text-indigo-200 hover:bg-indigo-900 transition flex items-center gap-1">
+                <span>↩</span> UNDO
+            </button>
+            <!-- Replay the same randomized layout setup -->
+            <button onclick="restartGame()" class="px-2.5 py-1.5 rounded text-[10px] md:text-xs font-bold bg-yellow-600 text-white hover:bg-yellow-500 transition">
+                RETRY BOARD
+            </button>
+            <!-- Start new randomized board -->
+            <button id="btnNewGame" onclick="startNewGame()" class="px-2.5 py-1.5 rounded text-[10px] md:text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 transition">
+                NEW GAME
+            </button>
+        </div>
+    </header>
+
+    <!-- SCOREBOARD DASHBOARD: Keeps track of real-time streak multipliers, scores and clear state -->
+    <div class="w-full max-w-5xl grid grid-cols-2 sm:grid-cols-5 gap-1.5 mt-1 z-10">
+        <div class="arcade-panel p-1.5 flex flex-col items-center justify-center relative min-h-[50px] sm:min-h-[58px]" id="currentStreakPanel">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Combo Streak</span>
+            <span id="txtCurrentStreak" class="text-xl font-black text-yellow-400">0</span>
+            <div id="streakFireBanner" class="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-600 text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg hidden">STREAK INCOMING</div>
+        </div>
+        <div class="arcade-panel p-1.5 flex flex-col items-center justify-center min-h-[50px] sm:min-h-[58px]">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Best Streak</span>
+            <span id="txtBestStreak" class="text-xl font-black text-cyan-400">0</span>
+        </div>
+        <div class="arcade-panel p-1.5 flex flex-col items-center justify-center min-h-[50px] sm:min-h-[58px]">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Score</span>
+            <span id="txtScore" class="text-xl font-black text-pink-500">0</span>
+        </div>
+        <div class="arcade-panel p-1.5 flex flex-col items-center justify-center min-h-[50px] sm:min-h-[58px]">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider font-bold text-green-400">Foundations</span>
+            <span id="txtCardsCleared" class="text-xl font-black text-green-400">0/52</span>
+        </div>
+        <div class="arcade-panel p-1.5 flex flex-col items-center justify-center col-span-2 sm:col-span-1 min-h-[50px] sm:min-h-[58px]">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Moves played</span>
+            <span id="txtMoveCounter" class="text-xl font-black text-purple-400">0</span>
+        </div>
+    </div>
+
+    <!-- INTERACTIVE ARCADE CANVAS AREA -->
+    <main class="w-full max-w-5xl flex-grow my-3 relative rounded-xl overflow-hidden shadow-2xl border-4 border-gray-800">
+        <canvas id="gameCanvas" class="w-full h-full block bg-slate-950"></canvas>
+    </main>
+
+    <!-- AUTOMATED REPLAY HUD FOR STEP-BY-STEP DEMO -->
+    <div id="demoControls" class="fixed bottom-6 left-1/2 -translate-x-1/2 arcade-panel p-3 flex flex-wrap items-center justify-between gap-3 z-40 hidden border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-slate-950/95 max-w-lg w-[92%]">
+        <div class="flex flex-col flex-grow">
+            <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest animate-pulse">🤖 AUTO-SOLVER DEMO MODE</span>
+            <span id="demoStepInfo" class="text-xs text-white font-mono mt-0.5">Step 0 / 0</span>
+        </div>
+        <div class="flex gap-2 items-center flex-wrap">
+            <button id="btnPrevDemo" onclick="prevDemoStep()" class="px-2.5 py-1.5 bg-gray-800 text-[10px] font-bold rounded hover:bg-gray-700 transition">◀ BACK</button>
+            <button id="btnNextDemo" onclick="nextDemoStep()" class="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded hover:bg-emerald-500 transition">NEXT STEP ▶</button>
+            <button id="btnAutoPlay" onclick="toggleAutoPlay()" class="px-3 py-1.5 bg-cyan-600 text-white text-[10px] font-bold rounded hover:bg-cyan-500 transition">AUTO: OFF</button>
+            <button onclick="exitDemoMode()" class="px-2.5 py-1.5 bg-red-900 border border-red-600 text-red-200 text-[10px] font-bold rounded hover:bg-red-800 transition">EXIT</button>
+        </div>
+    </div>
+
+    <!-- HIGH-SCORE END STATS MODAL -->
+    <div id="statsModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div class="arcade-panel max-w-md w-full p-4 sm:p-6 text-center flex flex-col gap-3 sm:gap-4 border-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.3)]">
+            <h2 id="modalHeader" class="text-lg sm:text-xl font-black tracking-wider text-yellow-400 uppercase" style="font-family: 'Press Start 2P', monospace;">
+                STAGE CLEAR
+            </h2>
+            
+            <div class="grid grid-cols-2 gap-1.5 text-left my-0.5 font-bold text-xs">
+                <div class="bg-gray-900/60 p-2 rounded border border-gray-800">
+                    <div class="text-[9px] text-gray-400 uppercase">Cards on Foundation</div>
+                    <div id="lblCleared" class="text-sm sm:text-base text-white">0/52</div>
+                </div>
+                <div class="bg-gray-900/60 p-2 rounded border border-gray-800">
+                    <div class="text-[9px] text-gray-400 uppercase">Longest Combo Streak</div>
+                    <div id="lblLongest" class="text-sm sm:text-base text-white">0</div>
+                </div>
+                <div class="bg-gray-900/60 p-2 rounded border border-gray-800">
+                    <div class="text-[9px] text-gray-400 uppercase">Moves Played</div>
+                    <div id="lblTotalMoves" class="text-sm sm:text-base text-white">0</div>
+                </div>
+                <div class="bg-gray-900/60 p-2 rounded border border-gray-800">
+                    <div class="text-[9px] text-gray-400 uppercase">Final High Score</div>
+                    <div id="lblHighScore" class="text-sm sm:text-base text-white">0</div>
+                </div>
+            </div>
+
+            <!-- LIFETIME DATA & PLAYER REVIEW STATS -->
+            <div class="bg-gray-900/80 p-2.5 sm:p-3 rounded border border-indigo-500/30 text-center my-0.5">
+                <div class="text-[9px] text-indigo-400 uppercase font-black tracking-widest">LIFETIME HYPER DATA</div>
+                <div class="flex justify-around items-center my-1">
+                    <div>
+                        <span class="text-[10px] text-gray-400">Played:</span>
+                        <span id="lblLifetimeGames" class="text-xs text-white font-bold">0</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400">Wins:</span>
+                        <span id="lblLifetimeWins" class="text-xs text-white font-bold">0</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400">Win Rate:</span>
+                        <span id="lblWinRate" class="text-xs text-green-400 font-bold">0%</span>
+                    </div>
+                </div>
+                <div id="lblCritique" class="text-[11px] sm:text-xs font-bold text-yellow-400 mt-1.5 italic border-t border-gray-800 pt-1.5 tracking-wide leading-relaxed"></div>
+                
+                <button id="btnResetStats" onclick="resetLifetimeStats()" class="mt-2 text-[9px] text-red-400 hover:text-red-300 underline uppercase tracking-widest block mx-auto transition">
+                    ⚠ Reset Lifetime Stats
+                </button>
+            </div>
+
+            <!-- Custom board analysis section -->
+            <div class="w-full">
+                <button id="btnAnalyze" onclick="runSolvabilityAnalysis()" class="w-full py-2 bg-slate-900 border border-cyan-500 hover:bg-slate-800 text-cyan-400 font-bold text-[10px] rounded transition flex items-center justify-center gap-2 tracking-wider">
+                    <span>🔍</span> DIAGNOSE BOARD SOLVABILITY
+                </button>
+                <div id="analysisResult" class="hidden text-[10px] font-mono p-2.5 rounded border text-center mt-1.5"></div>
+                
+                <!-- Demo Offer trigger container -->
+                <div id="demoOfferContainer" class="hidden mt-2">
+                    <button onclick="startDemoMode()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] rounded transition flex items-center justify-center gap-2 tracking-wider">
+                        <span>🤖</span> WATCH STEP-BY-STEP SOLUTION DEMO
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Backtracking option to rescue games -->
+            <button id="btnModalRescue" onclick="rescueWithUndo()" class="w-full py-2 rounded font-bold bg-indigo-950 border border-indigo-500 hover:bg-indigo-900 text-indigo-200 transition text-[10px] tracking-wider">
+                ↩ UNDO LAST PLAY
+            </button>
+
+            <div class="flex gap-2">
+                <button onclick="restartGame()" class="flex-1 py-2.5 rounded font-black bg-yellow-600 hover:bg-yellow-500 text-white transition tracking-wider text-[10px]">
+                    RETRY SAME
+                </button>
+                <button onclick="startNewGame()" class="flex-1 py-2.5 rounded font-black bg-blue-600 hover:bg-blue-500 text-white transition tracking-wider text-[10px]">
+                    NEW GAME
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // AUDIO SYNTH ENGINE (No external file dependencies)
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function playSynthSound(type) {
+            try {
+                if (!audioCtx) audioCtx = new AudioContext();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'select') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, now); // D5
+                    osc.frequency.setValueAtTime(880, now + 0.05); // A5
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+
+                } else if (type === 'draw') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(220, now); // A3
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.2); // A2
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+
+                } else if (type === 'powerup') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.3);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+
+                } else if (type === 'explosion') {
+                    const bufferSize = audioCtx.sampleRate * 1.5; 
+                    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    
+                    const noise = audioCtx.createBufferSource();
+                    noise.buffer = buffer;
+                    
+                    const filter = audioCtx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.Q.setValueAtTime(8, now);
+                    filter.frequency.setValueAtTime(1000, now);
+                    filter.frequency.exponentialRampToValueAtTime(10, now + 1.2);
+                    
+                    const subOsc = audioCtx.createOscillator();
+                    subOsc.type = 'sawtooth';
+                    subOsc.frequency.setValueAtTime(100, now);
+                    subOsc.frequency.linearRampToValueAtTime(10, now + 0.8);
+                    
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+                    
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    subOsc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    noise.start(now);
+                    subOsc.start(now);
+                    noise.stop(now + 1.5);
+                    subOsc.stop(now + 1.5);
+
+                } else if (type === 'clear') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1046.5, now); // C6
+                    osc.frequency.setValueAtTime(1318.5, now + 0.08); // E6
+                    osc.frequency.setValueAtTime(1568.0, now + 0.16); // G6
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'evaluationChime') {
+                    for (let i = 0; i < 5; i++) {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sawtooth';
+                        const timeOffset = now + (i * 0.35);
+                        osc.frequency.setValueAtTime(850, timeOffset);
+                        osc.frequency.exponentialRampToValueAtTime(130, timeOffset + 0.32);
+                        gain.gain.setValueAtTime(0.08, timeOffset);
+                        gain.gain.exponentialRampToValueAtTime(0.001, timeOffset + 0.32);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(timeOffset);
+                        osc.stop(timeOffset + 0.35);
+                    }
+                }
+            } catch (e) {
+                console.warn("Synth audio initialization requires a click gesture.", e);
+            }
+        }
+
+        // DECK AND GAME STATE CONSTANTS
+        const SUITS = ['♠', '♥', '♦', '♣'];
+        const COLORS = { '♠': '#000000', '♣': '#000000', '♥': '#e63946', '♦': '#e63946' };
+        const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+        // Card structure: { suit, rank, value, color, faceUp }
+        let initialDeck = [];
+        let tableau = [[], [], [], [], [], [], []]; // 7 piles
+        let stockPile = [];                         // Hidden draw pile
+        let wastePile = [];                         // Exposed drawn cards
+        let foundations = [[], [], [], []];         // 4 suits target
+
+        let undoStack = [];
+
+        // Game Metrics & High-Scores
+        let currentStreak = 0;
+        let longestStreakThisGame = 0;
+        let bestStreakEver = parseInt(localStorage.getItem('klondike_chain_best_streak')) || 0;
+        let moveCounter = 0;
+        let gameScore = 0;
+        let cardsClearedCount = 0; // Out of 52
+        let gameActive = true;
+        let hasActionRegistered = false; 
+
+        let isHintsEnabled = true;
+
+        // Visual FX Variables
+        let isVictoryActive = false;
+        let victoryTimer = 0;
+        let isEvaluationActive = false;
+        let evaluationTimer = 0;
+        let evaluationIsVictory = false;
+        let evaluationText = "";
+        let evaluationSubtext = "";
+
+        // Automated Solver replay properties
+        let isDemoActive = false;
+        let demoPath = [];
+        let demoIndex = 0;
+        let autoPlayTimer = null;
+        let isAutoPlayOn = false;
+
+        let resetConfirmActive = false;
+        let resetTimerId = null;
+
+        // --- ANIMATION GRAPHICS ENGINE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let clickBoxes = []; 
+
+        // Drag and drop mechanics state
+        let draggingStack = null; // { colIdx, cardIdx, offsetX, offsetY, touchMode }
+        let dragPosition = { x: 0, y: 0 };
+
+        let particles = [];
+        let floatTexts = [];
+        let screenShakeAmount = 0;
+        let impactFlashFrames = 0;
+        let impactFlashColor = '#ffffff';
+
+        let activeComboNado = null;
+        let timeScale = 1.0;
+        let lastFrameTime = performance.now();
+
+        // Responsive positioning geometry
+        function getCardLayoutCoordinates(w, h) {
+            const gridCols = 7;
+            const cardWidth = Math.min(w / (gridCols + 0.8), 85);
+            const cardHeight = cardWidth * 1.45;
+            const gapX = (w - (gridCols * cardWidth)) / (gridCols + 1);
+            
+            return {
+                cardWidth,
+                cardHeight,
+                gapX,
+                topY: h * 0.05,       // Foundations & Stock
+                tableauStartY: h * 0.28, // Cascading tableaus
+                rowSpacing: cardHeight * 0.25, // Cascade distance face-down
+                rowSpacingFaceUp: cardHeight * 0.28 // Cascade distance face-up
+            };
+        }
+
+        function deepClone(obj) {
+            return JSON.parse(JSON.stringify(obj));
+        }
+
+        function pushToUndoStack() {
+            undoStack.push({
+                tableau: deepClone(tableau),
+                stockPile: deepClone(stockPile),
+                wastePile: deepClone(wastePile),
+                foundations: deepClone(foundations),
+                currentStreak: currentStreak,
+                longestStreakThisGame: longestStreakThisGame,
+                moveCounter: moveCounter,
+                gameScore: gameScore,
+                cardsClearedCount: cardsClearedCount,
+                hasActionRegistered: hasActionRegistered,
+                demoIndex: demoIndex 
+            });
+            updateUndoButtonDisplay();
+        }
+
+        function updateUndoButtonDisplay() {
+            const btn = document.getElementById('btnUndo');
+            if (undoStack.length > 0 && !isDemoActive) {
+                btn.removeAttribute('disabled');
+                btn.style.opacity = "1.0";
+            } else {
+                btn.setAttribute('disabled', 'true');
+                btn.style.opacity = "0.3";
+            }
+        }
+
+        function registerFirstActionOfGame() {
+            if (!hasActionRegistered && !isDemoActive) {
+                hasActionRegistered = true;
+                let totalGames = parseInt(localStorage.getItem('klondike_chain_total_games')) || 0;
+                totalGames++;
+                localStorage.setItem('klondike_chain_total_games', totalGames);
+            }
+        }
+
+        // Traditional Solitaire verification: red alternating on black, descending value
+        function isValidTableauMove(card, targetCard) {
+            if (!targetCard) {
+                return card.value === 13; // Kings only on empty columns
+            }
+            const isAlternatingColor = COLORS[card.suit] !== COLORS[targetCard.suit];
+            const isOneLower = card.value === targetCard.value - 1;
+            return isAlternatingColor && isOneLower;
+        }
+
+        // Foundation check: same suit, ascending values from Ace (1) to King (13)
+        function isValidFoundationMove(card, foundationIndex) {
+            const pile = foundations[foundationIndex];
+            if (pile.length === 0) {
+                return card.value === 1; // Aces first
+            }
+            const topCard = pile[pile.length - 1];
+            return card.suit === topCard.suit && card.value === topCard.value + 1;
+        }
+
+        // Auto-placement helper triggers on tap or double-click
+        function tryAutoplayCard(card, originInfo) {
+            for (let f = 0; f < 4; f++) {
+                if (isValidFoundationMove(card, f)) {
+                    registerFirstActionOfGame();
+                    pushToUndoStack();
+
+                    // Remove card from source
+                    removeCardFromOrigin(originInfo);
+
+                    foundations[f].push(card);
+                    cardsClearedCount++;
+                    currentStreak++;
+                    gameScore += 10 + currentStreak * 2;
+                    moveCounter++;
+
+                    triggerCardPlacementFx(card, originInfo, `FOUNDATION ${f + 1}`);
+                    postActionChecks();
+                    return true;
+                }
+            }
+
+            // Otherwise, attempt standard legal tableau spot
+            for (let t = 0; t < 7; t++) {
+                const targetCol = tableau[t];
+                const targetCard = targetCol.length > 0 ? targetCol[targetCol.length - 1] : null;
+                if (isValidTableauMove(card, targetCard)) {
+                    registerFirstActionOfGame();
+                    pushToUndoStack();
+
+                    removeCardFromOrigin(originInfo);
+
+                    tableau[t].push(card);
+                    gameScore += 5;
+                    currentStreak = 0; // Reset foundations build combo
+                    moveCounter++;
+
+                    triggerCardPlacementFx(card, originInfo, `TABLEAU ${t + 1}`);
+                    postActionChecks();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function removeCardFromOrigin(origin) {
+            if (origin.type === 'tableau') {
+                tableau[origin.colIdx].pop();
+                // Reveal new top card of tableau
+                revealTopTableauCard(origin.colIdx);
+            } else if (origin.type === 'waste') {
+                wastePile.pop();
+            }
+        }
+
+        function revealTopTableauCard(colIdx) {
+            const col = tableau[colIdx];
+            if (col.length > 0 && !col[col.length - 1].faceUp) {
+                col[col.length - 1].faceUp = true;
+                gameScore += 5;
+                spawnFloatingText("REVEAL +5", dragPosition.x || canvas.width / 4, canvas.height / 2, '#a855f7');
+                playSynthSound('select');
+            }
+        }
+
+        function triggerCardPlacementFx(card, origin, targetLabel) {
+            playSynthSound('select');
+            const targetX = dragPosition.x || canvas.width / 2;
+            const targetY = dragPosition.y || canvas.height / 2;
+            spawnFloatingText(`PLAYED!`, targetX, targetY - 20, '#10b981');
+            evaluateStreakMilestones(targetX, targetY);
+        }
+
+        function postActionChecks() {
+            if (currentStreak > longestStreakThisGame) {
+                longestStreakThisGame = currentStreak;
+            }
+            if (currentStreak > bestStreakEver) {
+                bestStreakEver = currentStreak;
+                localStorage.setItem('klondike_chain_best_streak', bestStreakEver);
+            }
+            updateHUDDisplays();
+            evaluateWinLossStatus();
+        }
+
+        function drawStockCard() {
+            if (!gameActive || isDemoActive) return;
+
+            registerFirstActionOfGame();
+            pushToUndoStack();
+
+            if (stockPile.length === 0) {
+                // Recycle waste pile back into stock pile
+                if (wastePile.length === 0) return;
+                stockPile = wastePile.reverse().map(c => {
+                    c.faceUp = false;
+                    return c;
+                });
+                wastePile = [];
+                playSynthSound('draw');
+                spawnFloatingText("RESET DECK", canvas.width / 4, canvas.height * 0.15, '#a8a29e');
+            } else {
+                const card = stockPile.pop();
+                card.faceUp = true;
+                wastePile.push(card);
+                playSynthSound('draw');
+            }
+
+            currentStreak = 0; // Reset foundations streak on draw
+            moveCounter++;
+            postActionChecks();
+        }
+
+        function evaluateStreakMilestones(fxX, fxY) {
+            spawnSparksBurst(fxX, fxY, '#ffb700', 15);
+
+            if (currentStreak >= 5) {
+                screenShakeAmount = Math.min(25, (currentStreak - 4) * 3.5);
+                playSynthSound('clear');
+                spawnSparksBurst(fxX, fxY, '#ff007f', 25);
+            }
+
+            if (currentStreak >= 12) {
+                playSynthSound('explosion');
+                triggerComboNado(fxX, fxY);
+            }
+        }
+
+        function triggerComboNado(startX, startY) {
+            timeScale = 0.08;
+            impactFlashColor = '#ff0055';
+            impactFlashFrames = 30;
+            screenShakeAmount = 35;
+
+            activeComboNado = {
+                x: startX,
+                y: startY,
+                radius: 40,
+                color: '#00f0ff',
+                targetY: canvas.height * 0.4,
+                scale: 1.0,
+                speed: 800,
+                pulse: 0
+            };
+        }
+
+        function evaluateWinLossStatus() {
+            // Victory Condition: All 52 cards arranged on foundations
+            if (cardsClearedCount === 52) {
+                gameActive = false;
+                triggerVictoryEffect();
+                return;
+            }
+
+            // In Klondike, checking for a strict dead-end block is complex, 
+            // so we let the user diagnostic run or trigger exit manually.
+        }
+
+        function triggerVictoryEffect() {
+            isVictoryActive = true;
+            victoryTimer = 0;
+            playSynthSound('clear');
+            impactFlashColor = '#00f0ff';
+            impactFlashFrames = 30;
+            screenShakeAmount = 30;
+
+            if (!isDemoActive) {
+                let totalWins = parseInt(localStorage.getItem('klondike_chain_total_wins')) || 0;
+                totalWins++;
+                localStorage.setItem('klondike_chain_total_wins', totalWins);
+            }
+
+            setTimeout(() => {
+                if (isVictoryActive) {
+                    isVictoryActive = false;
+                    triggerEvaluationSequence(true);
+                }
+            }, 5500);
+        }
+
+        function triggerEvaluationSequence(isVictory) {
+            isEvaluationActive = true;
+            evaluationTimer = 0;
+            evaluationIsVictory = isVictory;
+
+            let totalGames = parseInt(localStorage.getItem('klondike_chain_total_games')) || 0;
+            let totalWins = parseInt(localStorage.getItem('klondike_chain_total_wins')) || 0;
+            
+            if (isVictory && !hasActionRegistered) {
+                totalWins++;
+                totalGames++;
+            }
+            let winPercentage = totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
+
+            if (winPercentage <= 15) {
+                evaluationText = "HORRIBLE PLAYER";
+                evaluationSubtext = "SOLITAIRE ABILITY: UTTERLY TRASH!";
+            } else if (winPercentage <= 30) {
+                evaluationText = "NOT HORRIBLE, JUST TERRIBLE";
+                evaluationSubtext = "YOUR DECISION TREE IS AN EMBARRASSMENT!";
+            } else if (winPercentage <= 50) {
+                evaluationText = "MERELY OK";
+                evaluationSubtext = "AVERAGE BIOLOGICAL BRAIN CONFORMITY DETECTED.";
+            } else if (winPercentage <= 75) {
+                evaluationText = "PRETTY GOOD";
+                evaluationSubtext = "DECENT RATING FOR A CARBON LIFEFORM!";
+            } else {
+                evaluationText = "IMPRESSED FLESH BRAIN";
+                evaluationSubtext = "SOLITAIRE GOD STATUS OFFICIALLY SECURED!";
+            }
+
+            playSynthSound('evaluationChime');
+        }
+
+        function performUndo() {
+            if (undoStack.length === 0) return;
+
+            const stateSnapshot = undoStack.pop();
+
+            tableau = stateSnapshot.tableau;
+            stockPile = stateSnapshot.stockPile;
+            wastePile = stateSnapshot.wastePile;
+            foundations = stateSnapshot.foundations;
+            currentStreak = stateSnapshot.currentStreak;
+            longestStreakThisGame = stateSnapshot.longestStreakThisGame;
+            moveCounter = stateSnapshot.moveCounter;
+            gameScore = stateSnapshot.gameScore;
+            cardsClearedCount = stateSnapshot.cardsClearedCount;
+            hasActionRegistered = stateSnapshot.hasActionRegistered;
+            demoIndex = stateSnapshot.demoIndex || 0;
+
+            gameActive = true;
+            isVictoryActive = false;
+            isEvaluationActive = false;
+
+            playSynthSound('draw');
+            updateHUDDisplays();
+            updateUndoButtonDisplay();
+
+            if (isDemoActive) {
+                updateDemoModeHUD();
+            }
+        }
+
+        function rescueWithUndo() {
+            closeModal();
+            performUndo();
+        }
+
+        // --- ADVANCED DECISION SOLVER MATRIX ---
+        // Runs quick simulated look-aheads to evaluate potential game pathways.
+        function runGreedyHeuristicSolver() {
+            // Emulates moves towards foundation, then cascading, prioritizing reveals.
+            let simulatedTableau = deepClone(tableau);
+            let simulatedFoundations = deepClone(foundations);
+            let simulatedWaste = deepClone(wastePile);
+            let simulatedStock = deepClone(stockPile);
+            
+            let pathMoves = [];
+            let iterations = 0;
+            let cardsPlaced = cardsClearedCount;
+
+            // Simulating sequential moves to record step-by-step pathways
+            while (iterations < 120) {
+                iterations++;
+                let foundAction = false;
+
+                // Priority 1: Tableau to Foundations
+                for (let t = 0; t < 7; t++) {
+                    const col = simulatedTableau[t];
+                    if (col.length > 0) {
+                        const card = col[col.length - 1];
+                        for (let f = 0; f < 4; f++) {
+                            const pile = simulatedFoundations[f];
+                            const isValid = pile.length === 0 ? card.value === 1 : (card.suit === pile[pile.length - 1].suit && card.value === pile[pile.length - 1].value + 1);
+                            if (isValid) {
+                                col.pop();
+                                simulatedFoundations[f].push(card);
+                                if (col.length > 0 && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+                                pathMoves.push({ type: 'play', source: 'tableau', colIdx: t, target: 'foundation', foundationIdx: f, card });
+                                cardsPlaced++;
+                                foundAction = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (foundAction) break;
+                }
+                if (foundAction) continue;
+
+                // Priority 2: Waste to Foundations
+                if (simulatedWaste.length > 0) {
+                    const card = simulatedWaste[simulatedWaste.length - 1];
+                    for (let f = 0; f < 4; f++) {
+                        const pile = simulatedFoundations[f];
+                        const isValid = pile.length === 0 ? card.value === 1 : (card.suit === pile[pile.length - 1].suit && card.value === pile[pile.length - 1].value + 1);
+                        if (isValid) {
+                            simulatedWaste.pop();
+                            simulatedFoundations[f].push(card);
+                            pathMoves.push({ type: 'play', source: 'waste', target: 'foundation', foundationIdx: f, card });
+                            cardsPlaced++;
+                            foundAction = true;
+                            break;
+                        }
+                    }
+                }
+                if (foundAction) continue;
+
+                // Priority 3: Waste to Tableau
+                if (simulatedWaste.length > 0) {
+                    const card = simulatedWaste[simulatedWaste.length - 1];
+                    for (let t = 0; t < 7; t++) {
+                        const col = simulatedTableau[t];
+                        const targetCard = col.length > 0 ? col[col.length - 1] : null;
+                        if (isValidTableauMove(card, targetCard)) {
+                            simulatedWaste.pop();
+                            col.push(card);
+                            pathMoves.push({ type: 'play', source: 'waste', target: 'tableau', colIdx: t, card });
+                            foundAction = true;
+                            break;
+                        }
+                    }
+                }
+                if (foundAction) continue;
+
+                // Priority 4: Stock Draw
+                if (simulatedStock.length > 0) {
+                    const card = simulatedStock.pop();
+                    card.faceUp = true;
+                    simulatedWaste.push(card);
+                    pathMoves.push({ type: 'draw' });
+                    foundAction = true;
+                } else if (simulatedWaste.length > 0) {
+                    // Recycle stock
+                    simulatedStock = simulatedWaste.reverse().map(c => {
+                        c.faceUp = false;
+                        return c;
+                    });
+                    simulatedWaste = [];
+                    pathMoves.push({ type: 'draw' });
+                    foundAction = true;
+                }
+
+                if (!foundAction) break; // Dead end hit
+            }
+
+            return { maxCount: Math.min(52, cardsPlaced + 3), path: pathMoves };
+        }
+
+        let lastAnalysisResult = null; 
+
+        function runSolvabilityAnalysis() {
+            const btn = document.getElementById('btnAnalyze');
+            const resultDiv = document.getElementById('analysisResult');
+            const demoOffer = document.getElementById('demoOfferContainer');
+            
+            btn.setAttribute('disabled', 'true');
+            btn.innerText = "⚡ RUNNING SOLVER DIAGNOSTIC...";
+            resultDiv.classList.remove('hidden');
+            resultDiv.className = "text-xs font-mono p-3 rounded border border-cyan-500 bg-black/50 text-cyan-400 animate-pulse mt-2 text-center";
+            resultDiv.innerText = "Scanning game states... Calculating cascade pathways...";
+            
+            playSynthSound('draw'); 
+            
+            setTimeout(() => {
+                const startTime = performance.now();
+                const analysis = runGreedyHeuristicSolver();
+                const duration = (performance.now() - startTime).toFixed(1);
+                
+                lastAnalysisResult = analysis;
+                btn.style.display = "none"; 
+                
+                demoOffer.classList.remove('hidden');
+                
+                if (analysis.maxCount >= 48) {
+                    resultDiv.className = "text-xs font-mono p-3 rounded border border-green-500 bg-green-950/40 text-green-400 mt-2 text-left";
+                    resultDiv.innerHTML = `
+                        <div class="font-bold text-xs text-green-300 mb-1">🏆 BOARD SOLVABLE!</div>
+                        This deck setup is highly solvable! Clear paths exist to foundations.<br>
+                        <span class="text-[9px] text-gray-500 mt-1 block">Diagnostic duration: ${duration}ms</span>
+                    `;
+                    playSynthSound('clear');
+                } else {
+                    resultDiv.className = "text-xs font-mono p-3 rounded border border-red-500 bg-red-950/40 text-red-400 mt-2 text-left";
+                    resultDiv.innerHTML = `
+                        <div class="font-bold text-xs text-red-300 mb-1">⚠️ IMPOSSIBLE CASUALTY</div>
+                        A strict lock is expected deep inside this layout.<br>
+                        Estimated max clear: <strong>${analysis.maxCount}/52 cards</strong>.<br>
+                        <span class="text-[9px] text-gray-500 mt-1 block">Diagnostic duration: ${duration}ms</span>
+                    `;
+                    playSynthSound('select');
+                }
+            }, 1000); 
+        }
+
+        function resetLifetimeStats() {
+            const btn = document.getElementById('btnResetStats');
+            if (!resetConfirmActive) {
+                resetConfirmActive = true;
+                btn.innerText = "⚠️ TAP AGAIN TO RESET";
+                btn.className = "mt-2 text-[10px] text-red-500 font-bold hover:text-red-400 underline uppercase tracking-widest block mx-auto animate-pulse";
+                
+                resetTimerId = setTimeout(() => {
+                    resetConfirmActive = false;
+                    btn.innerText = "⚠ Reset Lifetime Stats";
+                    btn.className = "mt-2 text-[9px] text-red-400 hover:text-red-300 underline uppercase tracking-widest block mx-auto";
+                }, 3000);
+            } else {
+                clearTimeout(resetTimerId);
+                resetConfirmActive = false;
+                
+                localStorage.setItem('klondike_chain_total_games', 0);
+                localStorage.setItem('klondike_chain_total_wins', 0);
+                playSynthSound('explosion');
+                
+                btn.innerText = "⚠ Reset Lifetime Stats";
+                btn.className = "mt-2 text-[9px] text-red-400 hover:text-red-300 underline uppercase tracking-widest block mx-auto";
+                
+                displayGameOverModal(evaluationIsVictory);
+            }
+        }
+
+        // --- DEMO / SOLVER REPLAY CODE ---
+        function startDemoMode() {
+            closeModal();
+            if (!lastAnalysisResult) {
+                lastAnalysisResult = runGreedyHeuristicSolver();
+            }
+
+            // Restore board back to starting state snapshots
+            tableau = deepClone(initialDeck.tableau);
+            stockPile = deepClone(initialDeck.stockPile);
+            wastePile = deepClone(initialDeck.wastePile);
+            foundations = [[], [], [], []];
+
+            undoStack = [];
+            currentStreak = 0;
+            longestStreakThisGame = 0;
+            moveCounter = 0;
+            gameScore = 0;
+            cardsClearedCount = 0;
+            gameActive = true;
+            isVictoryActive = false;
+            isEvaluationActive = false;
+
+            particles = [];
+            floatTexts = [];
+            screenShakeAmount = 0;
+            impactFlashFrames = 0;
+            activeComboNado = null;
+            timeScale = 1.0;
+
+            isDemoActive = true;
+            demoPath = lastAnalysisResult.path;
+            demoIndex = 0;
+            isAutoPlayOn = false;
+
+            document.getElementById('demoControls').classList.remove('hidden');
+            updateDemoModeHUD();
+            updateHUDDisplays();
+            playSynthSound('powerup');
+        }
+
+        function updateDemoModeHUD() {
+            const stepText = document.getElementById('demoStepInfo');
+            stepText.innerText = `Move ${demoIndex} / ${demoPath.length} (${lastAnalysisResult.maxCount} clear target)`;
+
+            const btnPrev = document.getElementById('btnPrevDemo');
+            const btnNext = document.getElementById('btnNextDemo');
+
+            if (demoIndex === 0) {
+                btnPrev.setAttribute('disabled', 'true');
+                btnPrev.style.opacity = "0.3";
+            } else {
+                btnPrev.removeAttribute('disabled');
+                btnPrev.style.opacity = "1";
+            }
+
+            if (demoIndex >= demoPath.length) {
+                btnNext.setAttribute('disabled', 'true');
+                btnNext.style.opacity = "0.3";
+                if (isAutoPlayOn) {
+                    toggleAutoPlay(); 
+                }
+            } else {
+                btnNext.removeAttribute('disabled');
+                btnNext.style.opacity = "1";
+            }
+        }
+
+        function nextDemoStep() {
+            if (!isDemoActive || demoIndex >= demoPath.length) return;
+
+            const action = demoPath[demoIndex];
+            pushToUndoStack();
+
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+            const geo = getCardLayoutCoordinates(w, h);
+
+            if (action.type === 'play') {
+                if (action.source === 'tableau') {
+                    const col = tableau[action.colIdx];
+                    const card = col.pop();
+                    if (action.target === 'foundation') {
+                        foundations[action.foundationIdx].push(card);
+                        cardsClearedCount++;
+                        currentStreak++;
+                        gameScore += 10 + currentStreak * 2;
+                    } else {
+                        tableau[action.colIdx].push(card); // fallback
+                    }
+                    revealTopTableauCard(action.colIdx);
+                } else if (action.source === 'waste') {
+                    const card = wastePile.pop();
+                    if (action.target === 'foundation') {
+                        foundations[action.foundationIdx].push(card);
+                        cardsClearedCount++;
+                        currentStreak++;
+                        gameScore += 10 + currentStreak * 2;
+                    } else {
+                        wastePile.push(card);
+                    }
+                }
+                playSynthSound('select');
+                spawnFloatingText("+PLAY", w / 2, h / 2, '#eab308');
+            } else if (action.type === 'draw') {
+                if (stockPile.length === 0) {
+                    if (wastePile.length > 0) {
+                        stockPile = wastePile.reverse().map(c => {
+                            c.faceUp = false;
+                            return c;
+                        });
+                        wastePile = [];
+                    }
+                } else {
+                    const card = stockPile.pop();
+                    card.faceUp = true;
+                    wastePile.push(card);
+                }
+                playSynthSound('draw');
+            }
+
+            demoIndex++;
+            moveCounter++;
+            updateDemoModeHUD();
+            updateHUDDisplays();
+            evaluateWinLossStatus();
+        }
+
+        function prevDemoStep() {
+            if (!isDemoActive || demoIndex <= 0) return;
+            performUndo();
+        }
+
+        function toggleAutoPlay() {
+            const btn = document.getElementById('btnAutoPlay');
+            if (isAutoPlayOn) {
+                clearInterval(autoPlayTimer);
+                isAutoPlayOn = false;
+                btn.innerText = "AUTO: OFF";
+                btn.className = "px-3 py-1.5 bg-cyan-600 text-white text-[10px] font-bold rounded hover:bg-cyan-500 transition";
+            } else {
+                isAutoPlayOn = true;
+                btn.innerText = "AUTO: ON";
+                btn.className = "px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded hover:bg-emerald-500 transition animate-pulse";
+                autoPlayTimer = setInterval(() => {
+                    if (demoIndex < demoPath.length) {
+                        nextDemoStep();
+                    } else {
+                        toggleAutoPlay();
+                    }
+                }, 1000); 
+            }
+        }
+
+        function exitDemoMode() {
+            if (isAutoPlayOn) {
+                toggleAutoPlay();
+            }
+            isDemoActive = false;
+            document.getElementById('demoControls').classList.add('hidden');
+            updateHUDDisplays();
+            updateUndoButtonDisplay();
+        }
+
+        // --- SCOREBOARD SYNC INTERACTION ---
+        function updateHUDDisplays() {
+            document.getElementById('txtCurrentStreak').innerText = currentStreak;
+            document.getElementById('txtBestStreak').innerText = bestStreakEver;
+            document.getElementById('txtScore').innerText = gameScore;
+            document.getElementById('txtCardsCleared').innerText = `${cardsClearedCount}/52`;
+            document.getElementById('txtMoveCounter').innerText = moveCounter;
+
+            const btnRescue = document.getElementById('btnModalRescue');
+            if (isDemoActive) {
+                btnRescue.style.display = "none";
+            } else {
+                btnRescue.style.display = "block";
+            }
+
+            const fireBanner = document.getElementById('streakFireBanner');
+            if (currentStreak >= 12) {
+                fireBanner.classList.remove('hidden');
+                fireBanner.innerText = "🔥 COMBO-NADO ACTIVE";
+                fireBanner.className = "absolute -top-3 left-1/2 -translate-x-1/2 bg-cyan-500 text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg animate-bounce text-black";
+            } else if (currentStreak >= 8) {
+                fireBanner.classList.remove('hidden');
+                fireBanner.innerText = "🔥 ULTRA COMBO";
+                fireBanner.className = "absolute -top-3 left-1/2 -translate-x-1/2 bg-red-500 text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg text-white";
+            } else if (currentStreak >= 4) {
+                fireBanner.classList.remove('hidden');
+                fireBanner.innerText = "🔥 HOT STREAK";
+                fireBanner.className = "absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg text-white";
+            } else {
+                fireBanner.classList.add('hidden');
+            }
+        }
+
+        // SHUFFLE & INITIALIZATION CONTROLLERS
+        function generateArcadeDeck() {
+            let fresh = [];
+            for (let suit of SUITS) {
+                for (let r = 0; r < RANKS.length; r++) {
+                    fresh.push({
+                        suit: suit,
+                        rank: RANKS[r],
+                        value: r + 1, 
+                        color: COLORS[suit],
+                        faceUp: false
+                    });
+                }
+            }
+            return fresh;
+        }
+
+        function shuffleDeck(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function startNewGame() {
+            closeModal();
+            exitDemoMode();
+
+            const deck = generateArcadeDeck();
+            shuffleDeck(deck);
+
+            tableau = [[], [], [], [], [], [], []];
+            foundations = [[], [], [], []];
+            stockPile = [];
+            wastePile = [];
+
+            // Deal Traditional Klondike Layout (28 cards into tableau columns)
+            for (let c = 0; c < 7; c++) {
+                for (let r = c; r < 7; r++) {
+                    const card = deck.pop();
+                    if (r === c) card.faceUp = true; // Exposed top card
+                    tableau[r].push(card);
+                }
+            }
+
+            stockPile = deck; // Remaining cards into draw stock
+
+            // Save clean starting state snapshot for demo/restarts
+            initialDeck = {
+                tableau: deepClone(tableau),
+                stockPile: deepClone(stockPile),
+                wastePile: deepClone(wastePile)
+            };
+
+            hasActionRegistered = false; 
+            resetActiveSession();
+        }
+
+        function restartGame() {
+            closeModal();
+            exitDemoMode();
+
+            tableau = deepClone(initialDeck.tableau);
+            stockPile = deepClone(initialDeck.stockPile);
+            wastePile = deepClone(initialDeck.wastePile);
+            foundations = [[], [], [], []];
+
+            hasActionRegistered = false; 
+            resetActiveSession();
+        }
+
+        function resetActiveSession() {
+            undoStack = [];
+            updateUndoButtonDisplay();
+
+            currentStreak = 0;
+            longestStreakThisGame = 0;
+            moveCounter = 0;
+            gameScore = 0;
+            cardsClearedCount = 0;
+            gameActive = true;
+
+            particles = [];
+            floatTexts = [];
+            screenShakeAmount = 0;
+            impactFlashFrames = 0;
+            activeComboNado = null;
+            timeScale = 1.0;
+
+            isVictoryActive = false;
+            victoryTimer = 0;
+            isEvaluationActive = false;
+            evaluationTimer = 0;
+
+            document.getElementById('btnAnalyze').style.display = "block";
+            document.getElementById('btnAnalyze').removeAttribute('disabled');
+            document.getElementById('btnAnalyze').innerText = "🔍 DIAGNOSE BOARD SOLVABILITY";
+            document.getElementById('analysisResult').classList.add('hidden');
+            document.getElementById('analysisResult').innerText = "";
+            document.getElementById('demoOfferContainer').classList.add('hidden');
+            lastAnalysisResult = null;
+
+            updateHUDDisplays();
+            playSynthSound('powerup');
+        }
+
+        function resizeGameCanvas() {
+            const parent = canvas.parentNode;
+            const pxRatio = window.devicePixelRatio || 1;
+            
+            canvas.width = parent.clientWidth * pxRatio;
+            canvas.height = parent.clientHeight * pxRatio;
+            
+            ctx.scale(pxRatio, pxRatio);
+        }
+
+        function drawAutoScaledText(text, x, y, maxFont, baseScale, maxAllowedWidth, color, strokeColor = null, strokeWidth = 0) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(baseScale, baseScale);
+            
+            ctx.font = `900 ${maxFont}px 'Orbitron', sans-serif`;
+            let textWidth = ctx.measureText(text).width;
+            let finalScale = 1.0;
+            
+            if (textWidth > maxAllowedWidth) {
+                finalScale = maxAllowedWidth / textWidth;
+                ctx.scale(finalScale, finalScale);
+            }
+            
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = color;
+            
+            if (strokeColor && strokeWidth > 0) {
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = strokeWidth;
+                ctx.strokeText(text, 0, 0);
+            }
+            ctx.fillText(text, 0, 0);
+            ctx.restore();
+        }
+
+        // NEON CARD RENDERING ENGINE
+        function drawArcadeCardObject(card, x, y, width, height, shadowIntensity = 0.15) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Give subtle shadow based on cascade depth
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetY = 3;
+
+            // Render Card Base Back/Front
+            if (card.faceUp) {
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#cccccc';
+                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                ctx.roundRect(0, 0, width, height, 8);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+
+                // Suit and Rank details
+                ctx.save();
+                ctx.fillStyle = card.color;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.font = `900 ${width * 0.22}px 'Orbitron', sans-serif`;
+                ctx.fillText(card.rank + card.suit, width * 0.08, height * 0.08);
+                ctx.restore();
+
+                ctx.save();
+                ctx.fillStyle = card.color;
+                ctx.textAlign = 'center';
+                ctx.font = `900 ${width * 0.55}px 'Orbitron', sans-serif`;
+                ctx.textBaseline = 'middle';
+                ctx.fillText(card.suit, width / 2, height / 2 + 10);
+                ctx.restore();
+
+            } else {
+                // Classic deep neon arcade card back pattern
+                ctx.fillStyle = '#b91c1c';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.roundRect(0, 0, width, height, 8);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.lineWidth = 4;
+                for (let i = -width; i < width + height; i += 16) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i + height, height);
+                    ctx.stroke();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // COSMETIC EFFECTS AND PARTICLE SUBROUTINES
+        function spawnFloatingText(val, x, y, color) {
+            floatTexts.push({
+                text: val,
+                x: x,
+                y: y,
+                vy: -60,
+                alpha: 1.0,
+                life: 1.0,
+                color: color
+            });
+        }
+
+        function spawnSparksBurst(x, y, color, qty) {
+            for (let i = 0; i < qty; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 40 + Math.random() * 120;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: 2 + Math.random() * 5,
+                    color: color,
+                    alpha: 1.0,
+                    decay: 1.5 + Math.random() * 1.5,
+                    isFire: false,
+                    isShockwave: false
+                });
+            }
+        }
+
+        function spawnCombustionParticle(x, y, level) {
+            const spread = 35;
+            const px = x + (Math.random() - 0.5) * spread;
+            const py = y + (Math.random() - 0.5) * spread;
+            
+            let hue = '#f97316'; 
+            if (level >= 12) hue = '#22d3ee'; 
+            else if (level >= 8) hue = '#ec4899'; 
+
+            particles.push({
+                x: px,
+                y: py,
+                vx: (Math.random() - 0.5) * 30,
+                vy: -60 - Math.random() * 80,
+                size: 4 + Math.random() * 8,
+                color: hue,
+                alpha: 1.0,
+                decay: 1.8 + Math.random() * 1.2,
+                isFire: true,
+                isShockwave: false
+            });
+        }
+
+        function spawnAtomicShockwave(x, y, color) {
+            particles.push({
+                x: x,
+                y: y,
+                radius: 10,
+                maxRadius: 180,
+                color: color,
+                alpha: 1.0,
+                isShockwave: true
+            });
+        }
+
+        // GAME RENDERING DRAW THREAD
+        function mainRenderLoop() {
+            const now = performance.now();
+            const rawDt = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+
+            if (timeScale < 1.0) {
+                timeScale += rawDt * 1.8;
+                if (timeScale > 1.0) timeScale = 1.0;
+            }
+
+            const dt = rawDt * timeScale;
+
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+
+            const geo = getCardLayoutCoordinates(w, h);
+
+            clickBoxes = [];
+
+            ctx.save();
+            // Screen shake combo intensity
+            if (currentStreak >= 4) {
+                const maxShake = Math.min(10, (currentStreak - 4) * 0.8);
+                const dx = (Math.random() - 0.5) * maxShake;
+                const dy = (Math.random() - 0.5) * maxShake;
+                ctx.translate(dx, dy);
+            }
+            if (screenShakeAmount > 0.1) {
+                const dx = (Math.random() - 0.5) * screenShakeAmount;
+                const dy = (Math.random() - 0.5) * screenShakeAmount;
+                ctx.translate(dx, dy);
+                screenShakeAmount *= 0.88;
+            }
+
+            // Radial cyber grid background
+            const grad = ctx.createRadialGradient(w/2, h/2, 50, w/2, h/2, w);
+            grad.addColorStop(0, '#0a0a1a');
+            grad.addColorStop(1, '#020208');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            if (isVictoryActive) {
+                victoryTimer += dt;
+                screenShakeAmount = Math.max(screenShakeAmount, 8);
+                
+                if (Math.random() < 0.12) {
+                    playSynthSound('clear');
+                    spawnSparksBurst(
+                        Math.random() * w, 
+                        Math.random() * (h * 0.6) + 100, 
+                        Math.random() > 0.5 ? '#ff007f' : (Math.random() > 0.5 ? '#00f0ff' : '#ffb700'), 
+                        30
+                    );
+                }
+            }
+
+            // --- DRAW TOP PANEL: STOCK, WASTE, FOUNDATIONS ---
+            // 1. Stock Pile (Face Down)
+            const stockX = geo.gapX;
+            if (stockPile.length > 0) {
+                drawArcadeCardObject({ faceUp: false }, stockX, geo.topY, geo.cardWidth, geo.cardHeight);
+                clickBoxes.push({ type: 'stock', x: stockX, y: geo.topY, width: geo.cardWidth, height: geo.cardHeight });
+            } else {
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(stockX, geo.topY, geo.cardWidth, geo.cardHeight, 8);
+                ctx.stroke();
+                clickBoxes.push({ type: 'stock', x: stockX, y: geo.topY, width: geo.cardWidth, height: geo.cardHeight });
+            }
+
+            // 2. Waste Pile (Exposed top card of Stock)
+            const wasteX = geo.gapX * 2 + geo.cardWidth;
+            if (wastePile.length > 0) {
+                const topCard = wastePile[wastePile.length - 1];
+                if (!draggingStack || (draggingStack.type === 'waste')) {
+                    drawArcadeCardObject(topCard, wasteX, geo.topY, geo.cardWidth, geo.cardHeight);
+                }
+                clickBoxes.push({ type: 'waste', x: wasteX, y: geo.topY, width: geo.cardWidth, height: geo.cardHeight });
+            }
+
+            // 3. Foundations (4 Suit slots mapped on the top right)
+            const foundationStartX = w - (geo.gapX * 4 + geo.cardWidth * 4);
+            for (let f = 0; f < 4; f++) {
+                const fx = foundationStartX + f * (geo.cardWidth + geo.gapX);
+                const pile = foundations[f];
+                
+                if (pile.length > 0) {
+                    const topCard = pile[pile.length - 1];
+                    drawArcadeCardObject(topCard, fx, geo.topY, geo.cardWidth, geo.cardHeight);
+                } else {
+                    // Empty foundation outline with suit indicators
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.25)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.roundRect(fx, geo.topY, geo.cardWidth, geo.cardHeight, 8);
+                    ctx.stroke();
+
+                    // Tiny generic placeholders inside
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
+                    ctx.font = `bold ${geo.cardWidth * 0.4}px 'Orbitron'`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('A', fx + geo.cardWidth / 2, geo.topY + geo.cardHeight / 2);
+                    ctx.restore();
+                }
+                clickBoxes.push({ type: 'foundation', foundationIdx: f, x: fx, y: geo.topY, width: geo.cardWidth, height: geo.cardHeight });
+            }
+
+            // --- DRAW MIDDLE TABLEAU STACKS ---
+            for (let c = 0; c < 7; c++) {
+                const tx = geo.gapX + c * (geo.cardWidth + geo.gapX);
+                const col = tableau[c];
+
+                if (col.length === 0) {
+                    // Draw neon placeholder outline for Empty Tableau Slot (Accepts Kings)
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 4]);
+                    ctx.beginPath();
+                    ctx.roundRect(tx, geo.tableauStartY, geo.cardWidth, geo.cardHeight, 8);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    clickBoxes.push({ type: 'tableau_empty', colIdx: c, x: tx, y: geo.tableauStartY, width: geo.cardWidth, height: geo.cardHeight });
+                } else {
+                    let currentY = geo.tableauStartY;
+                    for (let r = 0; r < col.length; r++) {
+                        const card = col[r];
+
+                        // Skip rendering if this part of the card chain is actively being dragged
+                        const isDraggingCurrent = draggingStack && draggingStack.colIdx === c && r >= draggingStack.cardIdx;
+
+                        if (!isDraggingCurrent) {
+                            drawArcadeCardObject(card, tx, currentY, geo.cardWidth, geo.cardHeight);
+                            
+                            // Map individual card hits for dragging/interaction checks
+                            clickBoxes.push({
+                                type: 'tableau',
+                                colIdx: c,
+                                cardIdx: r,
+                                x: tx,
+                                y: currentY,
+                                width: geo.cardWidth,
+                                height: geo.cardHeight
+                            });
+                        }
+
+                        // Cascade spacing depends on face state
+                        currentY += card.faceUp ? geo.rowSpacingFaceUp : geo.rowSpacing;
+                    }
+                }
+            }
+
+            // --- RENDER CURRENT DRAGGED STACK OVERLAY ---
+            if (draggingStack) {
+                let currentY = dragPosition.y - draggingStack.offsetY;
+                const dragX = dragPosition.x - draggingStack.offsetX;
+
+                const col = draggingStack.type === 'tableau' ? tableau[draggingStack.colIdx] : wastePile;
+                const startIndex = draggingStack.type === 'tableau' ? draggingStack.cardIdx : wastePile.length - 1;
+
+                if (draggingStack.type === 'tableau') {
+                    for (let r = startIndex; r < col.length; r++) {
+                        const card = col[r];
+                        drawArcadeCardObject(card, dragX, currentY, geo.cardWidth, geo.cardHeight);
+                        currentY += geo.rowSpacingFaceUp;
+                    }
+                } else if (draggingStack.type === 'waste' && wastePile.length > 0) {
+                    const card = wastePile[wastePile.length - 1];
+                    drawArcadeCardObject(card, dragX, currentY, geo.cardWidth, geo.cardHeight);
+                }
+            }
+
+            // --- ANIMATE COMBUNO COMBUSTIONS ---
+            if (wastePile.length > 0 && currentStreak >= 4) {
+                const offset = Math.min(wastePile.length / 4, 8);
+                const burstFreq = currentStreak >= 12 ? 0.9 : (currentStreak >= 8 ? 0.65 : 0.45);
+                if (Math.random() < burstFreq) {
+                    spawnCombustionParticle(wasteX + geo.cardWidth/2 + offset, geo.topY + geo.cardHeight/2 - offset, currentStreak);
+                }
+            }
+
+            // --- RENDER PARTICLES & SHOCKWAVES ---
+            if (activeComboNado) {
+                const ball = activeComboNado;
+                ball.pulse += dt * 10;
+                
+                const targetX = wasteX + geo.cardWidth / 2;
+                const dx = targetX - ball.x;
+                const dy = ball.targetY - ball.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < 15) {
+                    spawnAtomicShockwave(ball.x, ball.y, ball.color);
+                    spawnSparksBurst(ball.x, ball.y, '#ffffff', 40);
+                    spawnSparksBurst(ball.x, ball.y, '#00f0ff', 40);
+                    playSynthSound('clear');
+                    screenShakeAmount = 25;
+                    activeComboNado = null;
+                } else {
+                    const step = ball.speed * dt;
+                    ball.x += (dx / dist) * step;
+                    ball.y += (dy / dist) * step;
+
+                    ctx.save();
+                    const sizePulse = ball.radius + Math.sin(ball.pulse) * 8;
+                    const radGrad = ctx.createRadialGradient(ball.x, ball.y, 2, ball.x, ball.y, sizePulse);
+                    radGrad.addColorStop(0, '#ffffff');
+                    radGrad.addColorStop(0.3, '#a5f3fc');
+                    radGrad.addColorStop(0.8, 'rgba(6, 182, 212, 0.4)');
+                    radGrad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+
+                    ctx.fillStyle = radGrad;
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, sizePulse, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    drawAutoScaledText("COMBO FINISHER!", ball.x, ball.y - sizePulse - 20, 32, 1.0, w - 40, '#00f0ff', '#000000', 4);
+                    ctx.restore();
+                }
+            }
+
+            // Shockwaves loop
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                if (p.isShockwave) {
+                    p.radius += dt * 300;
+                    p.alpha = 1.0 - (p.radius / p.maxRadius);
+                    if (p.alpha <= 0) {
+                        particles.splice(i, 1);
+                        continue;
+                    }
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.strokeStyle = p.color;
+                    ctx.lineWidth = 6;
+                    ctx.shadowColor = p.color;
+                    ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // Floating feedback text loop
+            for (let i = floatTexts.length - 1; i >= 0; i--) {
+                const ft = floatTexts[i];
+                ft.life -= dt;
+                ft.y += ft.vy * dt;
+                ft.alpha = ft.life;
+
+                if (ft.life <= 0) {
+                    floatTexts.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = ft.alpha;
+                ctx.fillStyle = ft.color;
+                ctx.font = "900 24px 'Orbitron', sans-serif";
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            }
+
+            // Normal combustion/sparks particles loop
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                if (p.isShockwave) continue;
+
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                
+                if (p.isFire) p.vy -= dt * 60;
+                else p.vy += dt * 250; 
+
+                p.alpha -= dt * p.decay;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * (p.isFire ? 1.5 : 1.0), 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Flash effect overlay
+            if (impactFlashFrames > 0) {
+                ctx.fillStyle = impactFlashColor;
+                ctx.globalAlpha = 0.3 * (impactFlashFrames / 26);
+                ctx.fillRect(0, 0, w, h);
+                ctx.globalAlpha = 1.0;
+                impactFlashFrames--;
+            }
+
+            // Victory text animation overlay
+            if (isVictoryActive) {
+                ctx.save();
+                const colorCycle = Math.floor(performance.now() / 150) % 3;
+                let bannerColor = '#ffea00';
+                if (colorCycle === 1) bannerColor = '#00f0ff';
+                if (colorCycle === 2) bannerColor = '#ff007f';
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+                ctx.fillRect(0, 0, w, h);
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                const scale = 1.0 + Math.sin(performance.now() * 0.01) * 0.08;
+                
+                ctx.save();
+                ctx.translate(w/2, h/2 - 80);
+                ctx.scale(scale, scale);
+                ctx.font = "900 48px 'Audiowide', sans-serif";
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 12;
+                ctx.strokeText("🏆 SUPREME VICTORY 🏆", 0, 0);
+                ctx.fillStyle = bannerColor;
+                ctx.shadowColor = bannerColor;
+                ctx.shadowBlur = 20;
+                ctx.fillText("🏆 SUPREME VICTORY 🏆", 0, 0);
+                ctx.restore();
+
+                ctx.save();
+                ctx.translate(w/2, h/2);
+                ctx.scale(scale * 0.9, scale * 0.9);
+                ctx.font = "900 32px 'Press Start 2P', monospace";
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 8;
+                ctx.strokeText("STAGE COMPLETE!", 0, 0);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText("STAGE COMPLETE!", 0, 0);
+                ctx.restore();
+
+                ctx.font = "bold 12px 'Orbitron', sans-serif";
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText("CLICK SCREEN TO EVALUATE PERFORMANCE", w/2, h - 40);
+                ctx.restore();
+            }
+
+            // RENDER LAYER: CRITICAL JUDGMENT DIALOGUE
+            if (isEvaluationActive) {
+                evaluationTimer += dt;
+
+                ctx.save();
+                const flashAlpha = 0.25 + Math.sin(performance.now() * 0.015) * 0.15;
+                ctx.fillStyle = `rgba(239, 68, 68, ${flashAlpha})`;
+                ctx.fillRect(0, 0, w, h);
+
+                const textScale = 1.0 + Math.sin(performance.now() * 0.02) * 0.08;
+                const maxAllowedWidth = w - 40; 
+
+                drawAutoScaledText("CRITICAL JUDGMENT...", w/2, h/2 - 85, 20, textScale, maxAllowedWidth, '#eab308');
+                drawAutoScaledText(evaluationText, w/2, h/2, 36, textScale * 1.25, maxAllowedWidth, '#ffffff', '#000000', 8);
+                drawAutoScaledText(evaluationSubtext, w/2, h/2 + 75, 15, textScale * 0.88, maxAllowedWidth, '#22d3ee', '#000000', 4);
+
+                if (evaluationTimer > 1.0) {
+                    const promptBlink = Math.floor(performance.now() / 400) % 2 === 0;
+                    if (promptBlink) {
+                        drawAutoScaledText("TAP SCREEN TO CONTINUE", w/2, h - 50, 14, 1.0, maxAllowedWidth, '#f43f5e');
+                    }
+                }
+
+                ctx.restore();
+            }
+
+            ctx.restore();
+            requestAnimationFrame(mainRenderLoop);
+        }
+
+        function toggleHints() {
+            isHintsEnabled = !isHintsEnabled;
+            document.getElementById('btnHints').innerText = `HINTS: ${isHintsEnabled ? 'ON' : 'OFF'}`;
+            document.getElementById('btnHints').className = isHintsEnabled 
+                ? "px-2.5 py-1.5 rounded text-[10px] md:text-xs font-bold bg-gray-800 border border-gray-600 text-white hover:bg-gray-700 transition"
+                : "px-2.5 py-1.5 rounded text-[10px] md:text-xs font-bold bg-red-950 border border-red-500 text-red-200 hover:bg-red-900 transition";
+        }
+
+        function displayGameOverModal(isVictory = false) {
+            document.getElementById('modalHeader').innerText = isVictory ? "🏆 STAGE CLEARED" : "STAGE ENDED";
+            document.getElementById('modalHeader').className = isVictory 
+                ? "text-lg sm:text-xl font-black tracking-wider text-green-400 uppercase" 
+                : "text-lg sm:text-xl font-black tracking-wider text-red-500 uppercase";
+
+            document.getElementById('lblCleared').innerText = `${cardsClearedCount}/52`;
+            document.getElementById('lblLongest').innerText = longestStreakThisGame;
+            document.getElementById('lblTotalMoves').innerText = moveCounter;
+            document.getElementById('lblHighScore').innerText = gameScore;
+
+            let totalGames = parseInt(localStorage.getItem('klondike_chain_total_games')) || 0;
+            let totalWins = parseInt(localStorage.getItem('klondike_chain_total_wins')) || 0;
+            let winPercentage = totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
+
+            let critique = "";
+            if (winPercentage <= 15) {
+                critique = "💀 You are a terrible Solitaire player.";
+            } else if (winPercentage <= 30) {
+                critique = "🤡 Average human decision failure observed.";
+            } else if (winPercentage <= 50) {
+                critique = "😐 Decent card cascades... nothing special.";
+            } else if (winPercentage <= 75) {
+                critique = "⚡ Superior strategic sequencing patterns detected!";
+            } else {
+                critique = "🧠 Solitaire logic has achieved transcendent levels!";
+            }
+
+            document.getElementById('lblLifetimeGames').innerText = totalGames;
+            document.getElementById('lblLifetimeWins').innerText = totalWins;
+            document.getElementById('lblWinRate').innerText = `${winPercentage}%`;
+            document.getElementById('lblCritique').innerText = critique;
+
+            document.getElementById('statsModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('statsModal').classList.add('hidden');
+        }
+
+        // --- TOUCH AND MOUSE ACTION HANDLERS ---
+        function getEventCoordinates(event) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        // Mouse Down / Touch Start
+        function handleStartGesture(event) {
+            if (isVictoryActive) {
+                isVictoryActive = false;
+                triggerEvaluationSequence(true);
+                return;
+            }
+
+            if (isEvaluationActive) {
+                if (evaluationTimer > 0.5) { 
+                    isEvaluationActive = false;
+                    displayGameOverModal(evaluationIsVictory);
+                }
+                return;
+            }
+
+            if (isDemoActive) return; 
+
+            const coords = getEventCoordinates(event);
+            dragPosition = coords;
+
+            // Check interactable click bounds
+            for (let box of clickBoxes) {
+                if (coords.x >= box.x && coords.x <= box.x + box.width &&
+                    coords.y >= box.y && coords.y <= box.y + box.height) {
+                    
+                    if (box.type === 'stock') {
+                        drawStockCard();
+                    } else if (box.type === 'waste') {
+                        // Drag Waste pile card
+                        draggingStack = {
+                            type: 'waste',
+                            offsetX: coords.x - box.x,
+                            offsetY: coords.y - box.y
+                        };
+                        playSynthSound('select');
+                    } else if (box.type === 'tableau') {
+                        const col = tableau[box.colIdx];
+                        const card = col[box.cardIdx];
+                        
+                        if (card.faceUp) {
+                            // Pick up stack from clicked index downward
+                            draggingStack = {
+                                type: 'tableau',
+                                colIdx: box.colIdx,
+                                cardIdx: box.cardIdx,
+                                offsetX: coords.x - box.x,
+                                offsetY: coords.y - box.y
+                            };
+                            playSynthSound('select');
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Mouse Move / Touch Move
+        function handleDragGesture(event) {
+            if (!draggingStack) return;
+            const coords = getEventCoordinates(event);
+            dragPosition = coords;
+            event.preventDefault(); // Lock viewport panning
+        }
+
+        // Mouse Up / Touch End
+        function handleReleaseGesture(event) {
+            if (!draggingStack) return;
+
+            const finalCoords = dragPosition;
+            let moveSuccess = false;
+
+            // 1. Identify target box we released on
+            let targetBox = null;
+            for (let box of clickBoxes) {
+                if (finalCoords.x >= box.x && finalCoords.x <= box.x + box.width &&
+                    finalCoords.y >= box.y && finalCoords.y <= box.y + box.height) {
+                    targetBox = box;
+                    break;
+                }
+            }
+
+            // 2. Resolve placement logic
+            if (targetBox) {
+                if (draggingStack.type === 'tableau') {
+                    const srcColIdx = draggingStack.colIdx;
+                    const srcCardIdx = draggingStack.cardIdx;
+                    const srcCol = tableau[srcColIdx];
+                    const movingCard = srcCol[srcCardIdx];
+
+                    if (targetBox.type === 'tableau' || targetBox.type === 'tableau_empty') {
+                        const dstColIdx = targetBox.colIdx;
+                        // Avoid moving onto the exact same column
+                        if (srcColIdx !== dstColIdx) {
+                            const dstCol = tableau[dstColIdx];
+                            const targetCard = dstCol.length > 0 ? dstCol[dstCol.length - 1] : null;
+
+                            if (isValidTableauMove(movingCard, targetCard)) {
+                                registerFirstActionOfGame();
+                                pushToUndoStack();
+
+                                // Extract whole cascading card slice
+                                const cardSlice = srcCol.splice(srcCardIdx);
+                                tableau[dstColIdx] = dstCol.concat(cardSlice);
+
+                                revealTopTableauCard(srcColIdx);
+                                currentStreak = 0; // reset foundation combo
+                                gameScore += 10;
+                                moveCounter++;
+                                moveSuccess = true;
+                                playSynthSound('clear');
+                            }
+                        }
+                    } else if (targetBox.type === 'foundation' && srcCardIdx === srcCol.length - 1) {
+                        // Moving singular tableau card to Foundation
+                        const fIdx = targetBox.foundationIdx;
+                        if (isValidFoundationMove(movingCard, fIdx)) {
+                            registerFirstActionOfGame();
+                            pushToUndoStack();
+
+                            srcCol.pop();
+                            foundations[fIdx].push(movingCard);
+                            revealTopTableauCard(srcColIdx);
+
+                            cardsClearedCount++;
+                            currentStreak++;
+                            gameScore += 15 + currentStreak * 2;
+                            moveCounter++;
+                            moveSuccess = true;
+                            playSynthSound('clear');
+                        }
+                    }
+                } else if (draggingStack.type === 'waste' && wastePile.length > 0) {
+                    const movingCard = wastePile[wastePile.length - 1];
+
+                    if (targetBox.type === 'tableau' || targetBox.type === 'tableau_empty') {
+                        const dstColIdx = targetBox.colIdx;
+                        const dstCol = tableau[dstColIdx];
+                        const targetCard = dstCol.length > 0 ? dstCol[dstCol.length - 1] : null;
+
+                        if (isValidTableauMove(movingCard, targetCard)) {
+                            registerFirstActionOfGame();
+                            pushToUndoStack();
+
+                            wastePile.pop();
+                            tableau[dstColIdx].push(movingCard);
+
+                            currentStreak = 0;
+                            gameScore += 5;
+                            moveCounter++;
+                            moveSuccess = true;
+                            playSynthSound('clear');
+                        }
+                    } else if (targetBox.type === 'foundation') {
+                        const fIdx = targetBox.foundationIdx;
+                        if (isValidFoundationMove(movingCard, fIdx)) {
+                            registerFirstActionOfGame();
+                            pushToUndoStack();
+
+                            wastePile.pop();
+                            foundations[fIdx].push(movingCard);
+
+                            cardsClearedCount++;
+                            currentStreak++;
+                            gameScore += 15 + currentStreak * 2;
+                            moveCounter++;
+                            moveSuccess = true;
+                            playSynthSound('clear');
+                        }
+                    }
+                }
+            }
+
+            // Tapped / Double-clicked fallback auto-plays card
+            if (!moveSuccess) {
+                // If the user just quickly clicked without significant dragging distance, try automatic placement
+                const deltaX = Math.abs(draggingStack.offsetX);
+                const deltaY = Math.abs(draggingStack.offsetY);
+                if (deltaX < 15 && deltaY < 15) {
+                    if (draggingStack.type === 'tableau') {
+                        const srcColIdx = draggingStack.colIdx;
+                        const srcCardIdx = draggingStack.cardIdx;
+                        const srcCol = tableau[srcColIdx];
+                        // Auto-play is only valid for exposed top card
+                        if (srcCardIdx === srcCol.length - 1) {
+                            tryAutoplayCard(srcCol[srcCardIdx], { type: 'tableau', colIdx: srcColIdx });
+                        }
+                    } else if (draggingStack.type === 'waste' && wastePile.length > 0) {
+                        tryAutoplayCard(wastePile[wastePile.length - 1], { type: 'waste' });
+                    }
+                }
+            }
+
+            draggingStack = null;
+            postActionChecks();
+        }
+
+        // Setup Event Observers
+        canvas.addEventListener('mousedown', handleStartGesture);
+        canvas.addEventListener('mousemove', handleDragGesture);
+        window.addEventListener('mouseup', handleReleaseGesture);
+
+        canvas.addEventListener('touchstart', (e) => {
+            handleStartGesture(e);
+            e.preventDefault();
+        }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => {
+            handleDragGesture(e);
+            e.preventDefault();
+        }, { passive: false });
+        window.addEventListener('touchend', handleReleaseGesture);
+
+        window.addEventListener('resize', () => {
+            resizeGameCanvas();
+        });
+
+        window.onload = () => {
+            resizeGameCanvas();
+            startNewGame();
+            requestAnimationFrame(mainRenderLoop);
+        };
+    </script>
+</body>
+</html>
